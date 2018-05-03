@@ -62,7 +62,6 @@ function GetTableDataBox() {
          }
         }
     for (i in id_list) {
-        console.log(tabProduct);
         tableData.push(GetRowData(tabProduct.rows[id_list[i]]));
     }
 
@@ -157,7 +156,7 @@ function APIUpdateAttr(props) {
     props = props || {};
     var success_message = props.success_message || '更新成功!';
     var fail_message = props.fail_message || '更新时发生未知错误.';
-    var flash_message = true;
+    var flash_message = props.flash_message || true;
     if (props.flash_message === false){
         flash_message = false;
     }
@@ -205,6 +204,7 @@ function objectDelete(obj, name, url, redirectTo) {
             url: url,
             body: JSON.stringify(body),
             method: 'DELETE',
+            success_message: "删除成功",
             success: success,
             error: fail
         });
@@ -239,6 +239,13 @@ $.fn.serializeObject = function()
     });
     return o;
 };
+
+function makeLabel(data) {
+    return "<label class='detail-key'><b>" + data[0] + ": </b></label>" + data[1] + "</br>"
+}
+
+
+
 var jumpserver = {};
 jumpserver.checked = false;
 jumpserver.selected = {};
@@ -280,7 +287,7 @@ jumpserver.initDataTable = function (options) {
         buttons: [],
         columnDefs: columnDefs,
         ajax: {
-            url: options.ajax_url ,
+            url: options.ajax_url,
             dataSrc: ""
         },
         columns: options.columns || [],
@@ -300,7 +307,7 @@ jumpserver.initDataTable = function (options) {
                 last:       "»"
             }
         },
-        lengthMenu: [[15, 25, 50, -1], [15, 25, 50, "All"]]
+        lengthMenu: [[10, 15, 25, 50, -1], [10, 15, 25, 50, "All"]]
     });
     table.on('select', function(e, dt, type, indexes) {
         var $node = table[ type ]( indexes ).nodes().to$();
@@ -439,22 +446,56 @@ jumpserver.initServerSideDataTable = function (options) {
                 last:       "»"
             }
         },
-        lengthMenu: [[15, 25, 50], [15, 25, 50]]
+        lengthMenu: [[10, 15, 25, 50], [10, 15, 25, 50]]
     });
+    table.selected = [];
     table.on('select', function(e, dt, type, indexes) {
         var $node = table[ type ]( indexes ).nodes().to$();
         $node.find('input.ipt_check').prop('checked', true);
-        jumpserver.selected[$node.find('input.ipt_check').prop('id')] = true
+        jumpserver.selected[$node.find('input.ipt_check').prop('id')] = true;
+        if (type === 'row') {
+            var rows = table.rows(indexes).data();
+            $.each(rows, function (id, row) {
+                if (row.id){
+                    table.selected.push(row.id)
+                }
+            })
+        }
     }).on('deselect', function(e, dt, type, indexes) {
         var $node = table[ type ]( indexes ).nodes().to$();
         $node.find('input.ipt_check').prop('checked', false);
-        jumpserver.selected[$node.find('input.ipt_check').prop('id')] = false
+        jumpserver.selected[$node.find('input.ipt_check').prop('id')] = false;
+        if (type === 'row') {
+            var rows = table.rows(indexes).data();
+            $.each(rows, function (id, row) {
+                if (row.id){
+                    var index = table.selected.indexOf(row.id);
+                    if (index > -1){
+                        table.selected.splice(index, 1)
+                    }
+                }
+            })
+        }
     }).
     on('draw', function(){
         $('#op').html(options.op_html || '');
         $('#uc').html(options.uc_html || '');
+        var table_data = [];
+        $.each(table.rows().data(), function (id, row) {
+            if (row.id) {
+                table_data.push(row.id)
+            }
+        });
+
+        $.each(table.selected, function (id, data) {
+            var index = table_data.indexOf(data);
+            if (index > -1){
+                table.rows(index).select()
+            }
+        });
     });
-    $('.ipt_check_all').on('click', function() {
+    var table_id = table.settings()[0].sTableId;
+    $('#' + table_id + ' .ipt_check_all').on('click', function() {
         if ($(this).prop("checked")) {
             $(this).closest('table').find('.ipt_check').prop('checked', true);
             table.rows({search:'applied', page:'current'}).select();

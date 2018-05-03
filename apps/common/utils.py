@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 import re
+import sys
 from collections import OrderedDict
 from six import string_types
 import base64
@@ -71,6 +72,8 @@ class Signer(metaclass=Singleton):
         return s.dumps(value)
 
     def unsign(self, value):
+        if value is None:
+            return value
         s = JSONWebSignatureSerializer(self.secret_key)
         try:
             return s.loads(value)
@@ -231,6 +234,14 @@ def setattr_bulk(seq, key, value):
     return map(set_attr, seq)
 
 
+def set_or_append_attr_bulk(seq, key, value):
+    for obj in seq:
+        ori = getattr(obj, key, None)
+        if ori:
+            value += " " + ori
+        setattr(obj, key, value)
+
+
 def content_md5(data):
     """计算data的MD5值，经过Base64编码并返回str类型。
 
@@ -349,13 +360,38 @@ def get_short_uuid_str():
     return str(uuid.uuid4()).split('-')[-1]
 
 
-def is_uuid(s):
-    if UUID_PATTERN.match(s):
-        return True
+def is_uuid(seq):
+    if isinstance(seq, str):
+        if UUID_PATTERN.match(seq):
+            return True
+        else:
+            return False
     else:
-        return False
+        for s in seq:
+            if not is_uuid(s):
+                return False
+        return True
 
 
 def get_signer():
     signer = Signer(settings.SECRET_KEY)
     return signer
+
+
+class TeeObj:
+    origin_stdout = sys.stdout
+
+    def __init__(self, file_obj):
+        self.file_obj = file_obj
+
+    def write(self, msg):
+        self.origin_stdout.write(msg)
+        self.file_obj.write(msg.replace('*', ''))
+
+    def flush(self):
+        self.origin_stdout.flush()
+        self.file_obj.flush()
+
+    def close(self):
+        self.file_obj.close()
+

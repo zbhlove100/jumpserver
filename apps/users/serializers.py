@@ -14,12 +14,15 @@ signer = get_signer()
 
 class UserSerializer(BulkSerializerMixin, serializers.ModelSerializer):
     groups_display = serializers.SerializerMethodField()
-    groups = serializers.PrimaryKeyRelatedField(many=True, queryset=UserGroup.objects.all())
+    groups = serializers.PrimaryKeyRelatedField(many=True, queryset=UserGroup.objects.all(), required=False)
 
     class Meta:
         model = User
         list_serializer_class = BulkListSerializer
-        exclude = ['first_name', 'last_name', 'password', '_private_key', '_public_key']
+        exclude = [
+            'first_name', 'last_name', 'password', '_private_key',
+            '_public_key', '_otp_secret_key', 'user_permissions'
+        ]
 
     def get_field_names(self, declared_fields, info):
         fields = super(UserSerializer, self).get_field_names(declared_fields, info)

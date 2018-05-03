@@ -15,10 +15,11 @@
     {% csrf_token %}
     <h3>{% trans 'Basic' %}</h3>
     {% bootstrap_field form.hostname layout="horizontal" %}
+    {% bootstrap_field form.platform layout="horizontal" %}
     {% bootstrap_field form.ip layout="horizontal" %}
     {% bootstrap_field form.port layout="horizontal" %}
-    {% bootstrap_field form.platform layout="horizontal" %}
     {% bootstrap_field form.public_ip layout="horizontal" %}
+    {% bootstrap_field form.domain layout="horizontal" %}
 
     <div class="hr-line-dashed"></div>
     <h3>{% trans 'Auth' %}</h3>
@@ -33,7 +34,7 @@
     <div class="form-group {% if form.errors.labels %} has-error {% endif %}">
         <label for="{{ form.labels.id_for_label }}" class="col-md-2 control-label">{% trans 'Label' %}</label>
         <div class="col-md-9">
-            <select name="labels" class="select2 labels" data-placeholder="{% trans 'Select labels' %}" style="width: 100%" multiple="" tabindex="4" id="{{ form.labels.id_for_label }}">
+            <select name="labels" class="select2 labels" data-placeholder="{% trans 'Label' %}" style="width: 100%" multiple="" tabindex="4" id="{{ form.labels.id_for_label }}">
                 {% for name, labels in form.labels.field.queryset|group_labels %}
                 <optgroup label="{{ name }}">
                     {% for label in labels %}
@@ -83,6 +84,17 @@ $(document).ready(function () {
     $(".labels").select2({
         allowClear: true,
         templateSelection: format
+    });
+    $("#id_platform").change(function (){
+        var platform = $("#id_platform option:selected").text();
+        var port = 22;
+        if(platform === 'Windows'){
+            port = 3389;
+        }
+        if(platform === 'Other'){
+            port = null;
+        }
+        $("#id_port").val(port);
     });
 })
 </script>

@@ -9,6 +9,7 @@ import chardet
 from io import StringIO
 
 from django.conf import settings
+from django.db import transaction
 from django.utils.translation import ugettext_lazy as _
 from django.views.generic import TemplateView, ListView, View
 from django.views.generic.edit import CreateView, DeleteView, FormView, UpdateView
@@ -27,7 +28,7 @@ from common.mixins import JSONResponseMixin
 from common.utils import get_object_or_none, get_logger, is_uuid
 from common.const import create_success_msg, update_success_msg
 from .. import forms
-from ..models import Asset, AssetGroup, AdminUser, Cluster, SystemUser, Label, Node
+from ..models import Asset, AdminUser, SystemUser, Label, Node, Domain
 from ..hands import AdminUserRequiredMixin
 
 
@@ -48,6 +49,7 @@ class AssetListView(AdminUserRequiredMixin, TemplateView):
             'app': _('Assets'),
             'action': _('Asset list'),
             'labels': Label.objects.all().order_by('name'),
+            'nodes': Node.objects.all().order_by('-key'),
         }
         kwargs.update(context)
         return super().get_context_data(**kwargs)
@@ -232,8 +234,16 @@ class AssetExportView(View):
     def post(self, request, *args, **kwargs):
         try:
             assets_id = json.loads(request.body).get('assets_id', [])
+            assets_node_id = json.loads(request.body).get('node_id', None)
         except ValueError:
             return HttpResponse('Json object not valid', status=400)
+
+        if not assets_id and assets_node_id:
+            assets_node = get_object_or_none(Node, id=assets_node_id)
+            assets = assets_node.get_all_assets()
+            for asset in assets:
+                assets_id.append(asset.id)
+
         spm = uuid.uuid4().hex
         cache.set(spm, assets_id, 300)
         url = reverse_lazy('assets:asset-export') + '?spm=%s' % spm
@@ -244,6 +254,8 @@ class BulkImportAssetView(AdminUserRequiredMixin, JSONResponseMixin, FormView):
     form_class = forms.FileForm
 
     def form_valid(self, form):
+        node_id = self.request.GET.get("node_id")
+        node = get_object_or_none(Node, id=node_id) if node_id else Node.root()
         f = form.cleaned_data['file']
         det_result = chardet.detect(f.read())
         f.seek(0)  # reset file seek index
@@ -273,35 +285,44 @@ class BulkImportAssetView(AdminUserRequiredMixin, JSONResponseMixin, FormView):
             if set(row) == {''}:
                 continue
 
-            asset_dict = dict(zip(attr, row))
-            id_ = asset_dict.pop('id', 0)
-            for k, v in asset_dict.items():
+            asset_dict_raw = dict(zip(attr, row))
+            asset_dict = dict()
+            for k, v in asset_dict_raw.items():
+                v = v.strip()
                 if k == 'is_active':
-                    v = True if v in ['TRUE', 1, 'true'] else False
+                    v = False if v in ['False', 0, 'false'] else True
                 elif k == 'admin_user':
                     v = get_object_or_none(AdminUser, name=v)
                 elif k in ['port', 'cpu_count', 'cpu_cores']:
                     try:
                         v = int(v)
                     except ValueError:
-                        v = 0
-                else:
-                    continue
-                asset_dict[k] = v
+                        v = ''
+                elif k == 'domain':
+                    v = get_object_or_none(Domain, name=v)
 
-            asset = get_object_or_none(Asset, id=id_) if is_uuid(id_) else None
+                if v != '':
+                    asset_dict[k] = v
+
+            asset = None
+            asset_id = asset_dict.pop('id', None)
+            if asset_id:
+                asset = get_object_or_none(Asset, id=asset_id)
             if not asset:
                 try:
                     if len(Asset.objects.filter(hostname=asset_dict.get('hostname'))):
                         raise Exception(_('already exists'))
-                    asset = Asset.objects.create(**asset_dict)
-                    created.append(asset_dict['hostname'])
-                    assets.append(asset)
+                    with transaction.atomic():
+                        asset = Asset.objects.create(**asset_dict)
+                        if node:
+                            asset.nodes.set([node])
+                        created.append(asset_dict['hostname'])
+                        assets.append(asset)
                 except Exception as e:
                     failed.append('%s: %s' % (asset_dict['hostname'], str(e)))
             else:
                 for k, v in asset_dict.items():
-                    if v:
+                    if v != '':
                         setattr(asset, k, v)
                 try:
                     asset.save()

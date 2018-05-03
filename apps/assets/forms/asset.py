@@ -16,6 +16,7 @@ class AssetCreateForm(forms.ModelForm):
         fields = [
             'hostname', 'ip', 'public_ip', 'port',  'comment',
             'nodes', 'is_active', 'admin_user', 'labels', 'platform',
+            'domain',
 
         ]
         widgets = {
@@ -26,9 +27,15 @@ class AssetCreateForm(forms.ModelForm):
                 'class': 'select2', 'data-placeholder': _('Admin user')
             }),
             'labels': forms.SelectMultiple(attrs={
-                'class': 'select2', 'data-placeholder': _('Labels')
+                'class': 'select2', 'data-placeholder': _('Label')
             }),
             'port': forms.TextInput(),
+            'domain': forms.Select(attrs={
+                'class': 'select2', 'data-placeholder': _('Domain')
+            }),
+        }
+        labels = {
+            'nodes': _("Node"),
         }
         help_texts = {
             'hostname': '* required',
@@ -38,7 +45,8 @@ class AssetCreateForm(forms.ModelForm):
                 'root or other NOPASSWD sudo privilege user existed in asset,'
                 'If asset is windows or other set any one, more see admin user left menu'
             ),
-            'platform': _("* required Must set exact system platform, Windows, Linux ...")
+            'platform': _("* required Must set exact system platform, Windows, Linux ..."),
+            'domain': _("If your have some network not connect with each other, you can set domain")
         }
 
 
@@ -48,18 +56,25 @@ class AssetUpdateForm(forms.ModelForm):
         fields = [
             'hostname', 'ip', 'port', 'nodes',  'is_active', 'platform',
             'public_ip', 'number', 'comment', 'admin_user', 'labels',
+            'domain',
         ]
         widgets = {
             'nodes': forms.SelectMultiple(attrs={
-                'class': 'select2', 'data-placeholder': _('Nodes')
+                'class': 'select2', 'data-placeholder': _('Node')
             }),
             'admin_user': forms.Select(attrs={
                 'class': 'select2', 'data-placeholder': _('Admin user')
             }),
             'labels': forms.SelectMultiple(attrs={
-                'class': 'select2', 'data-placeholder': _('Labels')
+                'class': 'select2', 'data-placeholder': _('Label')
             }),
             'port': forms.TextInput(),
+            'domain': forms.Select(attrs={
+                'class': 'select2', 'data-placeholder': _('Domain')
+            }),
+        }
+        labels = {
+            'nodes': _("Node"),
         }
         help_texts = {
             'hostname': '* required',
@@ -70,7 +85,8 @@ class AssetUpdateForm(forms.ModelForm):
                 'root or other NOPASSWD sudo privilege user existed in asset,'
                 'If asset is windows or other set any one, more see admin user left menu'
             ),
-            'platform': _("* required Must set exact system platform, Windows, Linux ...")
+            'platform': _("* required Must set exact system platform, Windows, Linux ..."),
+            'domain': _("If your have some network not connect with each other, you can set domain")
         }
 
 
@@ -106,10 +122,10 @@ class AssetBulkUpdateForm(forms.ModelForm):
         ]
         widgets = {
             'labels': forms.SelectMultiple(
-                attrs={'class': 'select2', 'data-placeholder': _('Select labels')}
+                attrs={'class': 'select2', 'data-placeholder': _('Label')}
             ),
             'nodes': forms.SelectMultiple(
-                attrs={'class': 'select2', 'data-placeholder': _('Select nodes')}
+                attrs={'class': 'select2', 'data-placeholder': _('Node')}
             ),
         }
 

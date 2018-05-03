@@ -16,8 +16,10 @@ class Node(models.Model):
     child_mark = models.IntegerField(default=0)
     date_create = models.DateTimeField(auto_now_add=True)
 
+    is_node = True
+
     def __str__(self):
-        return self.value
+        return self.full_value
 
     @property
     def name(self):
@@ -28,7 +30,7 @@ class Node(models.Model):
         if self == self.__class__.root():
             return self.value
         else:
-            return '{}/{}'.format(self.value, self.parent.full_value)
+            return '{} / {}'.format(self.parent.full_value, self.value)
 
     @property
     def level(self):
@@ -61,8 +63,8 @@ class Node(models.Model):
         assets = Asset.objects.filter(nodes__id=self.id)
         return assets
 
-    def get_active_assets(self):
-        return self.get_assets().filter(is_active=True)
+    def get_valid_assets(self):
+        return self.get_assets().valid()
 
     def get_all_assets(self):
         from .asset import Asset
@@ -70,11 +72,14 @@ class Node(models.Model):
             assets = Asset.objects.all()
         else:
             nodes = self.get_family()
-            assets = Asset.objects.filter(nodes__in=nodes)
+            assets = Asset.objects.filter(nodes__in=nodes).distinct()
         return assets
 
-    def get_all_active_assets(self):
-        return self.get_all_assets().filter(is_active=True)
+    def has_assets(self):
+        return self.get_all_assets()
+
+    def get_all_valid_assets(self):
+        return self.get_all_assets().valid()
 
     def is_root(self):
         return self.key == '0'

@@ -9,10 +9,11 @@ from django.utils.translation import ugettext as _
 
 from common.utils import get_object_or_none, capacity_convert, \
     sum_capacity, encrypt_password, get_logger
-from common.celery import register_as_period_task, after_app_shutdown_clean, \
-    after_app_ready_start, app as celery_app
+from ops.celery.utils import register_as_period_task, after_app_shutdown_clean, \
+    after_app_ready_start
+from ops.celery import app as celery_app
 
-from .models import SystemUser, AdminUser, Asset, Cluster
+from .models import SystemUser, AdminUser, Asset
 from . import const
 
 
@@ -95,6 +96,9 @@ def update_assets_hardware_info_util(assets, task_name=None):
         task_name = _("更新资产硬件信息")
     tasks = const.UPDATE_ASSETS_HARDWARE_TASKS
     hostname_list = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
+    if not hostname_list:
+        logger.info("Not hosts get, may be asset is not active or not unixlike platform")
+        return {}
     task, created = update_or_create_ansible_task(
         task_name, hosts=hostname_list, tasks=tasks, pattern='all',
         options=const.TASK_OPTIONS, run_as_admin=True, created_by='System',
@@ -214,7 +218,7 @@ def test_admin_user_connectability_period():
 def test_admin_user_connectability_manual(admin_user):
     # task_name = _("Test admin user connectability: {}").format(admin_user.name)
     task_name = _("测试管理行号可连接性: {}").format(admin_user.name)
-    return test_admin_user_connectability_util.delay(admin_user, task_name)
+    return test_admin_user_connectability_util(admin_user, task_name)
 
 
 @shared_task
@@ -275,7 +279,7 @@ def test_system_user_connectability_util(system_user, task_name):
     :return:
     """
     from ops.utils import update_or_create_ansible_task
-    assets = system_user.assets
+    assets = system_user.get_assets()
     hosts = [asset.hostname for asset in assets if asset.is_active and asset.is_unixlike()]
     tasks = const.TEST_SYSTEM_USER_CONN_TASKS
     if not hosts:
@@ -385,50 +389,17 @@ def push_system_user_util(system_users, assets, task_name):
     return task.run()
 
 
-def get_node_push_system_user_task_name(system_user, node):
-
-    # return _("Push system user to node: {} => {}").format(
-    return _("推送系统用户到节点资产: {} => {}").format(
-        system_user.name,
-        node.value
-    )
-
-
-def push_system_user_to_node(system_user, node):
-    assets = node.get_all_assets()
-    task_name = get_node_push_system_user_task_name(system_user, node)
-    push_system_user_util.delay([system_user], assets, task_name)
-
-
-@shared_task
-def push_system_user_related_nodes(system_user):
-    if not system_user.is_need_push():
-        msg = "push system user `{}` passed, may be not auto push or ssh " \
-              "protocol is not ssh".format(system_user.name)
-        logger.info(msg)
-        return
-
-    nodes = system_user.nodes.all()
-    for node in nodes:
-        push_system_user_to_node(system_user, node)
-
-
 @shared_task
 def push_system_user_to_assets_manual(system_user):
-    push_system_user_related_nodes(system_user)
+    assets = system_user.get_assets()
+    task_name = "推送系统用户到入资产: {}".format(system_user.name)
+    return push_system_user_util([system_user], assets, task_name=task_name)
 
 
-def push_node_system_users_to_asset(node, assets):
-    system_users = []
-    nodes = node.ancestor_with_node
-    # 获取该节点所有父节点有的系统用户, 然后推送
-    for n in nodes:
-        system_users.extend(list(n.systemuser_set.all()))
-
-    if system_users:
-        # task_name = _("Push system users to node: {}").format(node.value)
-        task_name = _("推送节点系统用户到新加入资产中: {}").format(node.value)
-        push_system_user_util.delay(system_users, assets, task_name)
+@shared_task
+def push_system_user_to_assets(system_user, assets):
+    task_name = _("推送系统用户到入资产: {}").format(system_user.name)
+    return push_system_user_util.delay([system_user], assets, task_name)
 
 
 # @shared_task
@@ -438,3 +409,7 @@ def push_node_system_users_to_asset(node, assets):
 # def push_system_user_period():
 #     for system_user in SystemUser.objects.all():
 #         push_system_user_related_nodes(system_user)
+
+
+
+

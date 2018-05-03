@@ -20,7 +20,7 @@ Jumpserver采纳分布式架构，支持多机房跨区域部署，中心节点�
 
 ### 功能
   
- ![Jumpserver功能](https://github.com/zbhlove100/jumpserver/tree/master/apps/static/imggit/Jumpserver13.png "Jumpserver功能")
+ ![Jumpserver功能](https://github.com/zbhlove100/jumpserver/tree/master/apps/static/img/Jumpserver13.png "Jumpserver功能")
 
 ### 开始使用
 
